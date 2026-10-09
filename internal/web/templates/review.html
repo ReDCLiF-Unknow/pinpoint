@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Review of {{.Review.SiteHost}} · PinPoint</title>
+  <meta name="robots" content="noindex">
+  <meta name="description" content="{{plural (len .Items) "annotation"}} on {{.Review.SiteHost}}{{with .Review.Reviewer}} from {{.}}{{end}}">
+  <!-- The same review as plain text, which is what a coding AI should read -->
+  <link rel="alternate" type="text/markdown" href="{{.Share}}.md">
+  <link rel="alternate" type="application/json" href="{{.Share}}.json">
+  {{template "assets"}}
+  {{template "workspace-style"}}
+  <style>
+    .review-title { min-width: 0; flex: 1 1 14rem; }
+    .review-title .h3 { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ai-text { font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18rem; overflow: auto; margin: .5rem 0 0; }
+    @media (max-width: 991.98px) {
+      body.workspace { overflow: auto; }
+      .main { flex-direction: column; }
+      .stage { height: 65vh; flex: none; }
+      .notes { position: static; transform: none; height: auto; border-radius: 0; box-shadow: none; }
+      .notes-list { overflow: visible; }
+    }
+  </style>
+</head>
+<body class="workspace">
+
+<header class="bar">
+  <a href="/" class="brand" title="PinPoint"><span class="brand-mark"><i class="ti ti-map-pin"></i></span></a>
+  <div class="review-title">
+    <div class="h3">Review of {{.Review.SiteHost}}</div>
+    <div class="small text-secondary text-truncate">
+      {{plural (len .Items) "annotation"}}{{if gt .Pages 1}} on {{.Pages}} pages{{end}}
+      {{with .Review.Reviewer}}· from {{.}}{{end}}
+      {{if .Review.Applied}}· sent {{date .Review.AppliedAt}}{{else}}· <span class="text-orange">draft, still being written</span>{{end}}
+    </div>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <button type="button" class="btn btn-primary" data-act="copy-ai" title="Copy the whole review as text to paste into a coding AI"><i class="ti ti-sparkles me-1"></i>Copy for AI</button>
+    <a class="btn" href="{{.Share}}.md" download="review-{{.Review.SiteHost}}.md" title="Download as Markdown"><i class="ti ti-markdown me-1"></i>Markdown</a>
+    <a class="btn" href="{{.Share}}.json" download="review-{{.Review.SiteHost}}.json" title="Download as JSON"><i class="ti ti-braces me-1"></i>JSON</a>
+    {{template "theme-toggle"}}
+  </div>
+</header>
+
+<div class="main">
+  <div class="stage" id="stage">
+    <iframe id="site" title="The website, with the annotations on it"
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals"></iframe>
+    <div class="stage-cover" id="loading"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading the page</span></div></div>
+    <div class="alert alert-warning stage-banner" id="banner" role="status" hidden>
+      <i class="ti ti-alert-triangle"></i><div class="flex-fill" data-text></div>
+      <button type="button" class="btn btn-sm" data-act="back-to-last">Go back</button>
+    </div>
+  </div>
+
+  <aside class="notes" id="notes" aria-label="Annotations">
+    <div class="notes-list" id="notes-list">
+      {{$page := ""}}
+      {{range .Items}}
+      {{if ne .PageURL $page}}{{$page = .PageURL}}
+      <div class="page-group"><i class="ti ti-file"></i>{{.Page}}<span>{{.PageTitle}}</span></div>
+      {{end}}
+      {{$l := label .Label}}
+      <article class="note" data-id="{{.ID}}" tabindex="0" aria-label="Annotation {{.Number}}">
+        <span class="num {{.Label}}">{{.Number}}</span>
+        <div class="body">
+          <div class="meta">
+            <span class="fw-bold text-{{.Label}}">{{$l.Title}}</span>
+            <span>· {{.Device}}</span>
+            <span class="moved" data-moved hidden title="The element this was attached to has moved or is gone"><i class="ti ti-alert-triangle"></i> moved</span>
+          </div>
+          {{if .Quote}}<div class="quote">“{{.Quote}}”</div>{{end}}
+          {{if .Comment}}<p class="comment">{{.Comment}}</p>{{else}}<p class="comment empty">No comment; see the mark.</p>{{end}}
+          {{if .Shot}}<a href="{{.Shot}}" target="_blank" rel="noopener" data-no-select><img class="thumb" src="{{.Shot}}" alt="Screenshot of annotation {{.Number}}" loading="lazy"></a>{{end}}
+          <details data-no-select>
+            <summary>Element details</summary>
+            <div class="mt-1"><code>{{.Selector}}</code></div>
+            <div class="text-secondary mt-1">{{.Role}}{{with .ElText}}, text “{{.}}”{{end}}</div>
+            {{with .ElHTML}}<pre>{{.}}</pre>{{end}}
+          </details>
+        </div>
+      </article>
+      {{else}}
+      <div class="note-empty"><i class="ti ti-message-circle"></i>Nothing has been marked yet.</div>
+      {{end}}
+      <div class="p-3">
+        <details>
+          <summary class="small text-secondary">Text for your coding AI</summary>
+          <p class="small text-secondary mt-2 mb-0">Paste the link, or this text, into your coding AI. Plain-text versions: <a href="{{.Share}}.md">Markdown</a>, <a href="{{.Share}}.json">JSON</a>.</p>
+          <pre class="ai-text" id="ai-text">{{.Markdown}}</pre>
+        </details>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="application/json" id="pp-config">{{json .Config}}</script>
+<script src="/static/app.js?v={{.Version}}"></script>
+{{template "theme-script"}}
+</body>
+</html>

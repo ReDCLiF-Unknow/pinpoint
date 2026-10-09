@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harbour Coffee Roasters</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="/"><img src="/logo.svg" alt="">Harbour Coffee</a>
+    <nav class="main-nav">
+      <a href="/">Home</a>
+      <a href="/about.html">About us</a>
+      <a href="/#beans">Our beans</a>
+      <a href="https://example.org/" >Partners</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>Small-batch coffee, roasted by the sea</h1>
+      <p>We roast twice a week in our harbour workshop, so the beans you buy are never more than a few days old.</p>
+      <a class="btn btn-primary" href="/about.html">Learn more</a>
+      <a class="btn btn-ghost" href="#contact">Get in touch</a>
+    </div>
+    <img src="/beans.svg" alt="Roasted coffee beans">
+  </section>
+
+  <section class="features" id="beans">
+    <div class="card">
+      <h3>Harbour Blend</h3>
+      <p>Chocolate, toasted almond and a little sea salt. Our everyday espresso.</p>
+      <div class="price">€12</div>
+    </div>
+    <div class="card">
+      <h3>Lighthouse Single Origin</h3>
+      <p>Bright and fruity, from a cooperative in Huila, Colombia.</p>
+      <div class="price">€15</div>
+    </div>
+    <div class="card">
+      <h3>Night Shift Decaf</h3>
+      <p>All of the flavour, none of the 3 a.m. thoughts.</p>
+      <div class="price">€13</div>
+    </div>
+  </section>
+
+  <section class="hours">
+    <h2>Opening hours</h2>
+    <p id="hours">Loading…</p>
+  </section>
+
+  <section class="contact" id="contact">
+    <h2>Get in touch</h2>
+    <form method="post" action="/contact">
+      <label>Your email <input type="email" name="email" placeholder="you@example.com"></label>
+      <label>Message <textarea name="message" rows="4"></textarea></label>
+      <button class="btn btn-primary" type="submit">Send</button>
+    </form>
+  </section>
+
+  <footer class="site-footer">
+    © 2026 Harbour Coffee Roasters · Pier 4 · <a href="/about.html">Visit us</a>
+  </footer>
+  <script>
+    fetch('/hours.json').then(function (r) { return r.json(); }).then(function (h) {
+      document.getElementById('hours').textContent = 'Weekdays ' + h.weekdays + ', Saturday ' + h.saturday + ', Sunday ' + h.sunday + '.';
+    }).catch(function () { document.getElementById('hours').textContent = 'Call us for opening hours.'; });
+    try { localStorage.setItem('visited', '1'); } catch (e) { document.body.dataset.storage = 'blocked'; }
+  </script>
+</body>
+</html>

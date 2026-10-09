@@ -1,0 +1,13 @@
+services:
+  pinpoint:
+    # Use the published image, or swap for `build: .` to build from this checkout.
+    image: ghcr.io/redclif-unknow/pinpoint:main
+    container_name: pinpoint
+    ports:
+      - "8080:8080"
+    volumes:
+      - pinpoint-data:/data
+    restart: unless-stopped
+
+volumes:
+  pinpoint-data:

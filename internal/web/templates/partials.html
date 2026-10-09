@@ -1,0 +1,169 @@
+{{/*
+  Icons that only the page scripts use, so tools/vendor/fetch.py (which reads
+  the templates) keeps them in the subset font:
+  ti-trash ti-pencil ti-check ti-x ti-alert-triangle ti-loader-2 ti-message-circle
+  ti-highlight ti-square ti-scribble ti-bug ti-help ti-heart ti-copy ti-external-link
+  ti-map-pin ti-world-off ti-arrow-back-up ti-pointer ti-device-desktop
+*/}}
+{{define "assets"}}
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📌%3C/text%3E%3C/svg%3E">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="theme-color" content="#1d273b">
+  <meta name="referrer" content="same-origin">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try { document.documentElement.setAttribute('data-bs-theme', localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')); } catch (e) {}
+  </script>
+  <!-- Everything is served from this server: no CDN learns which sites are
+       being reviewed. Regenerate with tools/vendor/fetch.py. -->
+  <link rel="stylesheet" href="/static/vendor/inter.css">
+  <link rel="stylesheet" href="/static/vendor/tabler.min.css">
+  <link rel="stylesheet" href="/static/vendor/tabler-icons.css">
+  <style>
+    :root { --tblr-font-sans-serif: 'Inter', system-ui, sans-serif;
+            --pp-change: #206bc4; --pp-bug: #d63939; --pp-question: #f76707; --pp-like: #2fb344; }
+    body { font-feature-settings: "cv11", "ss01"; }
+    .page-center {
+      background-image: radial-gradient(circle, color-mix(in srgb, var(--tblr-body-color) 14%, transparent) 1.2px, transparent 1.4px);
+      background-size: 22px 22px;
+    }
+    :root[data-bs-theme="dark"] .icon-to-dark, :root:not([data-bs-theme="dark"]) .icon-to-light { display: none; }
+    .brand-mark { width: 2rem; height: 2rem; border-radius: .5rem; background: var(--tblr-primary); color: #fff;
+                  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .brand-mark .ti { font-size: 1.15rem; }
+    .brand-mark.lg { width: 3.5rem; height: 3.5rem; border-radius: .9rem; }
+    .brand-mark.lg .ti { font-size: 2rem; }
+    /* The number on an annotation, in its label's colour */
+    .num { display: inline-flex; align-items: center; justify-content: center; min-width: 1.6rem; height: 1.6rem;
+           padding: 0 .35rem; border-radius: 999px; color: #fff; font-weight: 700; font-size: .8rem;
+           font-variant-numeric: tabular-nums; flex-shrink: 0; box-shadow: 0 0 0 2px var(--tblr-bg-surface); }
+    .num.change, .dot.change { background: var(--pp-change); } .num.bug, .dot.bug { background: var(--pp-bug); }
+    .num.question, .dot.question { background: var(--pp-question); } .num.like, .dot.like { background: var(--pp-like); }
+    .text-change { color: var(--pp-change) !important; } .text-bug { color: var(--pp-bug) !important; }
+    .text-question { color: var(--pp-question) !important; } .text-like { color: var(--pp-like) !important; }
+    .dot { width: .55rem; height: .55rem; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .visually-hidden-focusable:not(:focus) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  </style>
+{{end}}
+
+{{define "theme-toggle"}}
+<button type="button" class="btn btn-icon btn-ghost-secondary" data-theme-toggle title="Switch between light and dark" aria-label="Switch between light and dark">
+  <i class="ti ti-moon icon-to-dark"></i><i class="ti ti-sun icon-to-light"></i>
+</button>
+{{end}}
+
+{{define "theme-script"}}
+<script>
+  document.querySelectorAll('[data-theme-toggle]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-bs-theme', t);
+      try { localStorage.setItem('theme', t); } catch (e) {}
+    });
+  });
+</script>
+{{end}}
+
+{{/* The editor and the shared review: the site in a frame, and a list beside it. */}}
+{{define "workspace-style"}}
+  <style>
+    html, body { height: 100%; }
+    body.workspace { display: flex; flex-direction: column; overflow: hidden; background: var(--tblr-bg-surface-secondary); }
+    .bar { display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; background: var(--tblr-bg-surface);
+           border-bottom: 1px solid var(--tblr-border-color); flex-wrap: wrap; position: relative; z-index: 5; }
+    .bar .brand { display: flex; align-items: center; gap: .5rem; text-decoration: none; color: inherit; font-weight: 700; }
+    .bar .sep { width: 1px; align-self: stretch; background: var(--tblr-border-color); margin: 0 .25rem; }
+    .address { display: flex; align-items: center; gap: .25rem; flex: 1 1 16rem; min-width: 12rem; }
+    .address form { flex: 1; }
+    .address input { font-size: .8125rem; background: var(--tblr-bg-surface-secondary); }
+    .seg { display: inline-flex; padding: 2px; border-radius: var(--tblr-border-radius); background: var(--tblr-bg-surface-secondary);
+           border: 1px solid var(--tblr-border-color); }
+    .seg button { border: 0; background: transparent; color: var(--tblr-secondary); padding: .3rem .65rem; border-radius: calc(var(--tblr-border-radius) - 2px);
+                  display: inline-flex; align-items: center; gap: .35rem; font-weight: 500; font-size: .875rem; white-space: nowrap; }
+    .seg button:hover:not(:disabled) { color: var(--tblr-body-color); }
+    .seg button[aria-pressed="true"] { background: var(--tblr-bg-surface); color: var(--tblr-body-color); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+    .seg button:disabled { opacity: .45; }
+    .seg .ti { font-size: 1.1rem; }
+    .tools[aria-disabled="true"] { opacity: .5; }
+    @media (max-width: 1199.98px) { .seg .lbl { display: none; } }
+
+    .main { flex: 1; display: flex; min-height: 0; }
+    .stage { flex: 1; position: relative; min-width: 0; display: flex; justify-content: center; }
+    .stage iframe { border: 0; width: 100%; height: 100%; background: #fff; display: block; }
+    .stage.annotating iframe { box-shadow: inset 0 0 0 3px var(--tblr-primary); }
+    .stage-cover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
+                   background: color-mix(in srgb, var(--tblr-bg-surface-secondary) 60%, transparent); }
+    .stage-banner { position: absolute; left: 50%; top: .75rem; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 1.5rem);
+                    display: flex; align-items: center; gap: .75rem; box-shadow: var(--tblr-box-shadow-dropdown); }
+    .hint { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%); z-index: 2; pointer-events: none;
+            background: rgba(24, 36, 51, .88); color: #fff; padding: .4rem .85rem; border-radius: 999px; font-size: .8125rem;
+            white-space: nowrap; transition: opacity .2s; }
+    .hint[hidden] { display: block !important; opacity: 0; }
+
+    .notes { width: 22rem; flex-shrink: 0; display: flex; flex-direction: column; background: var(--tblr-bg-surface);
+             border-left: 1px solid var(--tblr-border-color); min-height: 0; }
+    .notes-head { padding: .75rem 1rem; border-bottom: 1px solid var(--tblr-border-color); display: flex; align-items: center; gap: .5rem; }
+    .notes-list { flex: 1; overflow-y: auto; }
+    .notes-foot { padding: .75rem 1rem; border-top: 1px solid var(--tblr-border-color); }
+    .page-group { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--tblr-secondary);
+                  padding: .5rem 1rem; background: var(--tblr-bg-surface-secondary); display: flex; gap: .5rem; align-items: center;
+                  position: sticky; top: 0; z-index: 1; }
+    .page-group span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; font-weight: 500; }
+    .note { display: flex; gap: .65rem; padding: .75rem 1rem; border-bottom: 1px solid var(--tblr-border-color); cursor: pointer;
+            transition: background .15s; position: relative; }
+    .note:hover { background: var(--tblr-bg-surface-secondary); }
+    .note.selected { background: color-mix(in srgb, var(--tblr-primary) 8%, transparent); box-shadow: inset 3px 0 0 var(--tblr-primary); }
+    .note .body { flex: 1; min-width: 0; }
+    .note .meta { font-size: .75rem; color: var(--tblr-secondary); display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
+    .note .comment { white-space: pre-wrap; overflow-wrap: anywhere; margin: .2rem 0 0; }
+    .note .comment.empty { color: var(--tblr-secondary); font-style: italic; }
+    .note .quote { border-left: 3px solid color-mix(in srgb, var(--tblr-yellow) 70%, transparent); padding-left: .5rem; margin-top: .3rem;
+                   font-size: .8125rem; color: var(--tblr-secondary); overflow-wrap: anywhere; }
+    .note .actions { display: flex; gap: .15rem; opacity: 0; transition: opacity .15s; align-self: flex-start; }
+    .note:hover .actions, .note:focus-within .actions, .note.selected .actions { opacity: 1; }
+    @media (hover: none) { .note .actions { opacity: 1; } }
+    .note .moved { color: var(--tblr-orange); }
+    .note .thumb { display: block; margin-top: .5rem; border-radius: var(--tblr-border-radius); border: 1px solid var(--tblr-border-color);
+                   max-width: 100%; max-height: 9rem; object-fit: cover; object-position: top left; }
+    .note details { margin-top: .4rem; font-size: .75rem; }
+    .note details summary { color: var(--tblr-secondary); cursor: pointer; }
+    .note details code, .note details pre { font-size: .72rem; }
+    .note details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 10rem; overflow: auto; margin: .3rem 0 0; }
+    .note-empty { padding: 2rem 1.5rem; text-align: center; color: var(--tblr-secondary); }
+    .note-empty .ti { font-size: 2.5rem; display: block; margin-bottom: .5rem; opacity: .5; }
+
+    /* The card that asks what a new mark is about */
+    .draft { position: fixed; z-index: 20; width: 20rem; max-width: calc(100vw - 1.5rem); box-shadow: var(--tblr-box-shadow-dropdown); }
+    .draft textarea { resize: vertical; min-height: 5rem; }
+    .label-pick { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .label-pick button { border: 1px solid var(--tblr-border-color); background: transparent; border-radius: 999px; padding: .2rem .6rem;
+                         font-size: .8125rem; display: inline-flex; align-items: center; gap: .3rem; color: var(--tblr-body-color); }
+    .label-pick button[aria-pressed="true"] { color: #fff; border-color: transparent; }
+    .label-pick button[aria-pressed="true"][data-label="change"] { background: var(--pp-change); }
+    .label-pick button[aria-pressed="true"][data-label="bug"] { background: var(--pp-bug); }
+    .label-pick button[aria-pressed="true"][data-label="question"] { background: var(--pp-question); }
+    .label-pick button[aria-pressed="true"][data-label="like"] { background: var(--pp-like); }
+    .shot-state { font-size: .75rem; color: var(--tblr-secondary); }
+
+    /* Tabler's .card is display:flex, which would show a closed dialog */
+    dialog:not([open]) { display: none !important; }
+    dialog.card { padding: 0; border: 0; width: 32rem; max-width: calc(100vw - 2rem); color: var(--tblr-body-color); }
+    dialog::backdrop { background: rgba(24, 36, 51, .5); }
+    .share-url { font-family: var(--tblr-font-monospace); font-size: .8125rem; }
+    .toasts { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; flex-direction: column; gap: .5rem; align-items: center; }
+    .toasts .alert { margin: 0; box-shadow: var(--tblr-box-shadow-dropdown); background: var(--tblr-bg-surface); }
+
+    /* Narrow screens: the list becomes a sheet over the site, opened from the bar */
+    .notes-toggle { display: none; }
+    @media (max-width: 991.98px) {
+      .notes-toggle { display: inline-flex; }
+      .notes { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 60vh; z-index: 10; border-left: 0;
+               border-top: 1px solid var(--tblr-border-color); border-radius: 1rem 1rem 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+               transform: translateY(105%); transition: transform .25s; }
+      .notes.open { transform: none; }
+      .address { order: 10; flex-basis: 100%; }
+      .draft { left: .75rem !important; right: .75rem; bottom: .75rem; top: auto !important; width: auto; }
+    }
+  </style>
+{{end}}

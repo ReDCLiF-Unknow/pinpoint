@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>PinPoint · Review a website</title>
+  <meta name="description" content="Mark up a website, and send the feedback as a link a coding AI can act on.">
+  {{template "assets"}}
+  <style>
+    .start-form .form-control { font-size: 1rem; }
+    .how { counter-reset: how; }
+    .how li { list-style: none; display: flex; gap: .75rem; align-items: flex-start; margin-bottom: .6rem; }
+    .how li::before { counter-increment: how; content: counter(how); width: 1.5rem; height: 1.5rem; border-radius: 50%; flex-shrink: 0;
+                      display: inline-flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700;
+                      background: color-mix(in srgb, var(--tblr-primary) 14%, transparent); color: var(--tblr-primary); }
+    .recent a { overflow: hidden; }
+  </style>
+</head>
+<body>
+<div class="page page-center">
+  <div class="container container-tight py-4">
+    <div class="d-flex justify-content-end mb-2">{{template "theme-toggle"}}</div>
+    <div class="text-center mb-4">
+      <span class="brand-mark lg"><i class="ti ti-map-pin"></i></span>
+      <div class="h1 mt-3 mb-0">PinPoint</div>
+    </div>
+
+    <div class="card card-md">
+      <div class="card-body">
+        <h2 class="h2 text-center mb-1">Review a website</h2>
+        <p class="text-secondary text-center mb-4">Point at what you'd like changed, and send the link to whoever builds the site.</p>
+        {{if .Error}}<div class="alert alert-danger" role="alert">{{.Error}}</div>{{end}}
+        <form method="post" action="/reviews" class="start-form" id="start-form">
+          <label class="form-label" for="url">Website address</label>
+          <div class="input-group input-group-flat mb-3">
+            <span class="input-group-text"><i class="ti ti-world"></i></span>
+            <input id="url" type="text" name="url" class="form-control" placeholder="example.com" value="{{.URL}}"
+                   required autocomplete="url" inputmode="url" spellcheck="false" {{if not .URL}}autofocus{{end}}>
+          </div>
+          <button type="submit" class="btn btn-primary w-100" {{if .URL}}autofocus{{end}}>
+            <i class="ti ti-pointer me-1"></i>Start reviewing
+          </button>
+        </form>
+        <ol class="how ps-0 mt-4 mb-0 text-secondary small">
+          <li><span>The site opens with a toolbar. Browse it as usual.</span></li>
+          <li><span>Switch to <strong>Annotate</strong> and click, highlight, box or draw on anything.</span></li>
+          <li><span>Press <strong>Apply</strong> and send the review link. The agency's coding AI reads it.</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Reviews started in this browser. There are no accounts, so the edit
+         links are only kept here. -->
+    <div class="card mt-3 recent" id="recent" hidden>
+      <div class="card-header"><h3 class="card-title">Your reviews in this browser</h3></div>
+      <div class="list-group list-group-flush" id="recent-list"></div>
+    </div>
+  </div>
+</div>
+{{template "theme-script"}}
+<script>
+  (function () {
+    var list;
+    try { list = JSON.parse(localStorage.getItem('pinpoint.reviews') || '[]'); } catch (e) { list = []; }
+    if (!list.length) return;
+    var box = document.getElementById('recent-list');
+    list.slice(0, 8).forEach(function (r) {
+      var a = document.createElement('a');
+      a.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2';
+      a.href = r.edit;
+      var icon = document.createElement('i');
+      icon.className = 'ti ti-' + (r.sent ? 'check text-green' : 'pencil text-secondary');
+      var text = document.createElement('div');
+      text.className = 'flex-fill text-truncate';
+      var t = document.createElement('div');
+      t.className = 'text-truncate';
+      t.textContent = r.title || r.host;
+      var m = document.createElement('div');
+      m.className = 'small text-secondary text-truncate';
+      m.textContent = r.host + ' · ' + (r.count === 1 ? '1 annotation' : (r.count || 0) + ' annotations') + (r.sent ? ' · sent' : ' · draft');
+      text.append(t, m);
+      a.append(icon, text);
+      box.append(a);
+    });
+    document.getElementById('recent').hidden = false;
+  })();
+</script>
+</body>
+</html>

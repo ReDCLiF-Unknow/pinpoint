@@ -1,0 +1,31 @@
+:root { --ink: #2b2118; --cream: #fbf6ee; --rust: #b4532a; --sage: #6b7f5e; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: var(--ink); background: var(--cream); line-height: 1.6; }
+a { color: var(--rust); }
+.site-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; background: #fff; border-bottom: 1px solid #eadfcd; position: sticky; top: 0; z-index: 10; }
+.logo { display: flex; align-items: center; gap: .6rem; font-weight: bold; font-size: 1.2rem; color: var(--ink); text-decoration: none; }
+.logo img { width: 36px; height: 36px; }
+.main-nav a { margin-left: 1.5rem; color: var(--ink); text-decoration: none; font-family: system-ui, sans-serif; font-size: .95rem; }
+.main-nav a:hover { color: var(--rust); }
+.hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 3rem; align-items: center; padding: 4rem 2rem; max-width: 1100px; margin: 0 auto; }
+.hero h1 { font-size: 3rem; line-height: 1.1; margin: 0 0 1rem; }
+.hero p { font-size: 1.15rem; color: #5b4a3c; }
+.hero img { width: 100%; border-radius: 12px; }
+.btn { display: inline-block; padding: .7rem 1.3rem; border-radius: 6px; font-family: system-ui, sans-serif; font-size: .95rem; text-decoration: none; }
+.btn-primary { background: #e9dccb; color: var(--ink); }
+.btn-ghost { color: var(--rust); }
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 1100px; margin: 0 auto; padding: 1rem 2rem 4rem; }
+.card { background: #fff; border-radius: 10px; padding: 1.5rem; border: 1px solid #eadfcd; }
+.card h3 { margin-top: 0; }
+.price { font-size: 2rem; font-weight: bold; color: var(--sage); }
+.hours { max-width: 1100px; margin: 0 auto 3rem; padding: 0 2rem; font-family: system-ui, sans-serif; }
+.contact { max-width: 640px; margin: 0 auto 4rem; padding: 0 2rem; }
+.contact input, .contact textarea { width: 100%; padding: .6rem; margin: .3rem 0 1rem; border: 1px solid #d8c9b4; border-radius: 6px; font: inherit; }
+.site-footer { background: var(--ink); color: #e8dccb; padding: 2rem; text-align: center; font-family: system-ui, sans-serif; font-size: .9rem; }
+.site-footer a { color: #f3c9a6; }
+@media (max-width: 720px) {
+  .hero { grid-template-columns: 1fr; padding: 2rem 1.25rem; }
+  .hero h1 { font-size: 2.6rem; white-space: nowrap; }
+  .features { grid-template-columns: 1fr; }
+  .main-nav { display: none; }
+}

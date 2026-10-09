@@ -1,0 +1,109 @@
+name: CI
+
+# Runs on every push and pull request, so a change that breaks the build is
+# caught straight away rather than at release time.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Cross-compile
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+            export GOOS=${target%/*} GOARCH=${target#*/}
+            echo "building $GOOS/$GOARCH"
+            go build -o /dev/null ./cmd/server
+          done
+
+  # Builds the image on every run so the Dockerfile cannot quietly rot, and
+  # publishes it only from main, as ghcr.io/<owner>/pinpoint:main.
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Work out the image name
+        id: img
+        run: echo "name=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/pinpoint" >> "$GITHUB_OUTPUT"
+
+      # Building it is not the same as it working, so start the image and
+      # check it serves the app, and can start a review of a real website.
+      - name: Smoke-test the image
+        run: |
+          set -euo pipefail
+          docker buildx build --load -t pinpoint:test .
+          docker run -d --name pinpoint-test -p 8080:8080 pinpoint:test
+          up=
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:8080/ > /dev/null; then up=1; break; fi
+            sleep 1
+          done
+          if [ -z "$up" ]; then
+            echo "::error::the container never started serving"
+            docker logs pinpoint-test
+            exit 1
+          fi
+          curl -sf http://localhost:8080/static/agent.js > /dev/null
+          curl -sf http://localhost:8080/static/vendor/modern-screenshot.js > /dev/null
+          curl -sf http://localhost:8080/static/icon-192.png > /dev/null
+
+          # Start a review of a public site, which needs the proxy to reach
+          # it over HTTPS from inside the container.
+          edit=$(curl -s -o /dev/null -w '%{redirect_url}' --data-urlencode url=example.com http://localhost:8080/reviews)
+          case "$edit" in
+            */edit/*) ;;
+            *) echo "::error::starting a review did not lead to the editor: $edit"; docker logs pinpoint-test; exit 1 ;;
+          esac
+          curl -sf -o editor.html "$edit"
+          grep -q "Reviewing example.com" editor.html
+          echo "the image starts, and reviews a public website"
+          docker rm -f pinpoint-test
+
+      - name: Log in to ghcr.io
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+      - name: Publish
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/amd64,linux/arm64 --push \
+            -t '${{ steps.img.outputs.name }}:main' \
+            -t '${{ steps.img.outputs.name }}:${{ github.sha }}' .

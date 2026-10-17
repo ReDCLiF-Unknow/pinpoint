@@ -8,6 +8,13 @@
   'use strict';
   var cfg = JSON.parse(document.getElementById('pp-config').textContent);
   var EDIT = cfg.mode === 'edit';
+  // tr translates English text with what the server sent; {name} is filled
+  // in from vars.
+  function tr(s, vars) {
+    var out = (cfg.text && cfg.text[s]) || s;
+    for (var k in vars || {}) out = out.split('{' + k + '}').join(vars[k]);
+    return out;
+  }
   var LABELS = {
     change: { title: 'Change', icon: 'pencil' },
     bug: { title: 'Bug', icon: 'bug' },
@@ -51,7 +58,7 @@
   function pageLabel(raw) {
     try {
       var u = new URL(raw);
-      return (u.pathname === '/' && !u.search) ? 'Home page' : decodeURI(u.pathname) + u.search;
+      return (u.pathname === '/' && !u.search) ? tr('Home page') : decodeURI(u.pathname) + u.search;
     } catch (e) { return raw; }
   }
 
@@ -73,7 +80,7 @@
     if (!helloSinceLoad && !frameError) {
       // The page went somewhere the review script did not come with it:
       // usually a script that sent it straight to the real site.
-      showBanner('This page left the review, so it can\'t be shown or marked here.');
+      showBanner(tr('This page left the review, so it can\'t be shown or marked here.'));
     }
     frameError = false;
   });
@@ -209,13 +216,13 @@
   }
 
   function copy(text, done) {
-    var ok = function () { toast(done || 'Copied', 'ok'); };
+    var ok = function () { toast(done || tr('Copied'), 'ok'); };
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(ok, function () { fallbackCopy(text) ? ok() : toast('Couldn\'t copy. Select the text and copy it yourself.', 'error'); });
+      navigator.clipboard.writeText(text).then(ok, function () { fallbackCopy(text) ? ok() : toast(tr('Couldn\'t copy. Select the text and copy it yourself.'), 'error'); });
     } else if (fallbackCopy(text)) {
       ok();
     } else {
-      toast('Couldn\'t copy. Select the text and copy it yourself.', 'error');
+      toast(tr('Couldn\'t copy. Select the text and copy it yourself.'), 'error');
     }
   }
   function fallbackCopy(text) {
@@ -234,11 +241,11 @@
   function copyForAI() {
     fetch(cfg.share + '.md', { headers: { Accept: 'text/markdown' } })
       .then(function (r) { if (!r.ok) throw new Error(); return r.text(); })
-      .then(function (md) { copy(md, 'Copied. Paste it into your coding AI.'); })
+      .then(function (md) { copy(md, tr('Copied. Paste it into your coding AI.')); })
       .catch(function () {
         var pre = $('#ai-text');
-        if (pre) copy(pre.textContent, 'Copied. Paste it into your coding AI.');
-        else toast('Couldn\'t get the review text. Try again.', 'error');
+        if (pre) copy(pre.textContent, tr('Copied. Paste it into your coding AI.'));
+        else toast(tr('Couldn\'t get the review text. Try again.'), 'error');
       });
   }
 
@@ -270,7 +277,7 @@
       body: raw ? body : JSON.stringify(body)
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
-        if (!r.ok) throw new Error(data.error || 'Something went wrong. Try again.');
+        if (!r.ok) throw new Error(data.error || tr('Something went wrong. Try again.'));
         return data;
       });
     });
@@ -298,7 +305,7 @@
     var h = $('#hint');
     clearTimeout(hintTimer);
     if (mode !== 'annotate') { h.hidden = true; return; }
-    h.textContent = HINTS[tool];
+    h.textContent = tr(HINTS[tool]);
     h.hidden = false;
     hintTimer = setTimeout(function () { h.hidden = true; }, 4000);
   }
@@ -321,7 +328,7 @@
     draft = { id: m.id, data: m.draft || {}, png: undefined };
     form.comment.value = '';
     pickLabel('change');
-    shotState('Taking a screenshot…');
+    shotState(tr('Taking a screenshot…'));
     form.hidden = false;
     // Beside the mark, inside the window.
     var f = frame.getBoundingClientRect(), b = m.box || { x: 0, y: 0, w: 0, h: 0 };
@@ -348,7 +355,7 @@
     if (!draft || draft.id !== m.id) return;
     if (!m.png && draft.png) return; // a repaint that failed: keep the one we have
     draft.png = m.png || null;
-    shotState(m.png ? 'Screenshot taken' : 'No screenshot: this page couldn\'t be photographed');
+    shotState(m.png ? tr('Screenshot taken') : tr('No screenshot: this page couldn\'t be photographed'));
     if (!m.png && m.error) console.warn('PinPoint screenshot:', m.error);
   }
 
@@ -405,8 +412,8 @@
     $$('[data-count]').forEach(function (c) { c.textContent = list.length; });
     if (!list.length) {
       var empty = el('div', 'note-empty');
-      empty.append(icon('message-circle'), el('div', 'fw-bold mb-1', 'Nothing marked yet'),
-        el('div', 'small', 'Pick a tool above and click, select, box or draw on the page. Each mark gets a comment.'));
+      empty.append(icon('message-circle'), el('div', 'fw-bold mb-1', tr('Nothing marked yet')),
+        el('div', 'small', tr('Pick a tool above and click, select, box or draw on the page. Each mark gets a comment.')));
       box.append(empty);
       return;
     }
@@ -428,30 +435,30 @@
     var item = el('article', 'note' + (a.id === selected ? ' selected' : ''));
     item.dataset.id = a.id;
     item.tabIndex = 0;
-    item.setAttribute('aria-label', 'Annotation ' + n);
+    item.setAttribute('aria-label', tr('Annotation {n}', { n: n }));
     var body = el('div', 'body');
     var meta = el('div', 'meta');
-    meta.append(el('span', 'fw-bold text-' + a.label, LABELS[a.label].title));
+    meta.append(el('span', 'fw-bold text-' + a.label, tr(LABELS[a.label].title)));
     var moved = el('span', 'moved');
     moved.dataset.moved = '';
     moved.hidden = true;
-    moved.title = 'The element this was attached to has moved or is gone';
-    moved.append(icon('alert-triangle'), document.createTextNode(' moved'));
+    moved.title = tr('The element this was attached to has moved or is gone');
+    moved.append(icon('alert-triangle'), document.createTextNode(' ' + tr('moved')));
     meta.append(moved);
     body.append(meta);
     if (a.quote) body.append(el('div', 'quote', '“' + a.quote + '”'));
-    body.append(a.comment ? el('p', 'comment', a.comment) : el('p', 'comment empty', 'No comment; the mark says it.'));
+    body.append(a.comment ? el('p', 'comment', a.comment) : el('p', 'comment empty', tr('No comment; the mark says it.')));
     var actions = el('div', 'actions');
     var edit = el('button', 'btn btn-icon btn-sm btn-ghost-secondary');
     edit.type = 'button';
-    edit.title = 'Edit';
-    edit.setAttribute('aria-label', 'Edit annotation ' + n);
+    edit.title = tr('Edit');
+    edit.setAttribute('aria-label', tr('Edit annotation {n}', { n: n }));
     edit.append(icon('pencil'));
     edit.addEventListener('click', function () { editItem(item, a); });
     var del = el('button', 'btn btn-icon btn-sm btn-ghost-danger');
     del.type = 'button';
-    del.title = 'Delete';
-    del.setAttribute('aria-label', 'Delete annotation ' + n);
+    del.title = tr('Delete');
+    del.setAttribute('aria-label', tr('Delete annotation {n}', { n: n }));
     del.append(icon('trash'));
     del.addEventListener('click', function () { removeItem(a); });
     actions.append(edit, del);
@@ -470,7 +477,7 @@
       b.type = 'button';
       b.dataset.label = k;
       b.setAttribute('aria-pressed', String(k === label));
-      b.append(icon(LABELS[k].icon), document.createTextNode(LABELS[k].title));
+      b.append(icon(LABELS[k].icon), document.createTextNode(tr(LABELS[k].title)));
       b.addEventListener('click', function () {
         label = k;
         $$('button', pick).forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.label === k)); });
@@ -481,12 +488,12 @@
     ta.rows = 3;
     ta.maxLength = 4000;
     ta.value = a.comment;
-    ta.setAttribute('aria-label', 'Comment');
+    ta.setAttribute('aria-label', tr('Comment'));
     var row = el('div', 'd-flex justify-content-end gap-2');
-    var cancel = el('button', 'btn btn-sm', 'Cancel');
+    var cancel = el('button', 'btn btn-sm', tr('Cancel'));
     cancel.type = 'button';
     cancel.addEventListener('click', renderList);
-    var save = el('button', 'btn btn-sm btn-primary', 'Save');
+    var save = el('button', 'btn btn-sm btn-primary', tr('Save'));
     save.type = 'submit';
     row.append(cancel, save);
     form.append(pick, ta, row);
@@ -508,7 +515,7 @@
   }
 
   function removeItem(a) {
-    if (!confirm('Delete annotation ' + numberOf(a) + '?')) return;
+    if (!confirm(tr('Delete annotation {n}?', { n: numberOf(a) }))) return;
     api('/annotations/' + a.id + '/delete', {}).then(function () {
       list = list.filter(function (x) { return x !== a; });
       if (selected === a.id) selected = 0;
@@ -534,14 +541,14 @@
     cancelDraft();
     var dlg = $('#apply-dialog');
     if (!list.length) {
-      toast('Mark at least one thing on the page first.', 'info');
+      toast(tr('Mark at least one thing on the page first.'), 'info');
       return;
     }
     var pages = {};
     list.forEach(function (a) { pages[pageKey(a.pageUrl)] = true; });
     var n = Object.keys(pages).length;
-    $('[data-summary]', dlg).textContent = list.length + (list.length === 1 ? ' annotation' : ' annotations') +
-      (n > 1 ? ' on ' + n + ' pages' : '') + '. You get a link to send to whoever builds the site.';
+    $('[data-summary]', dlg).textContent = (list.length === 1 ? tr('1 annotation') : tr('{n} annotations', { n: list.length })) +
+      (n > 1 ? ' ' + tr('on {n} pages', { n: n }) : '') + '. ' + tr('You get a link to send to whoever builds the site.');
     try { if (!dlg.querySelector('#reviewer').value) dlg.querySelector('#reviewer').value = localStorage.getItem('pinpoint.name') || ''; } catch (e) {}
     $('[data-error]', dlg).hidden = true;
     dlg.showModal();
@@ -575,11 +582,11 @@
     try {
       url = raw.charAt(0) === '/' ? new URL(raw, site.origin) : new URL(/^[a-z]+:\/\//i.test(raw) ? raw : 'https://' + raw);
     } catch (err) {
-      toast('That isn\'t a web address.', 'error');
+      toast(tr('That isn\'t a web address.'), 'error');
       return;
     }
     if (siteKey(url.host) !== siteKey(cfg.host)) {
-      toast('This review is for ' + cfg.host + '. Other sites open in a new tab.', 'info');
+      toast(tr('This review is for {host}. Other sites open in a new tab.', { host: cfg.host }), 'info');
       window.open(url.href, '_blank', 'noopener');
       return;
     }
@@ -602,7 +609,7 @@
     $$('[data-act="apply"]').forEach(function (b) { b.addEventListener('click', openApply); });
     $('#apply-form').addEventListener('submit', apply);
     $$('[data-act="close-dialog"]').forEach(function (b) { b.addEventListener('click', function () { b.closest('dialog').close(); }); });
-    $('[data-act="copy-link"]').addEventListener('click', function () { copy($('#share-url').value, 'Link copied'); });
+    $('[data-act="copy-link"]').addEventListener('click', function () { copy($('#share-url').value, tr('Link copied')); });
     $$('[data-act="notes"]').forEach(function (b) { b.addEventListener('click', function () { $('#notes').classList.toggle('open'); }); });
     $('[data-act="back"]').addEventListener('click', function () { send({ pp: 'back' }); });
     $('[data-act="reload"]').addEventListener('click', function () { load(lastGood || cfg.site); });

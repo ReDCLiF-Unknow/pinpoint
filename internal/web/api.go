@@ -29,6 +29,8 @@ type editorConfig struct {
 	Reviewer    string             `json:"reviewer"`
 	Title       string             `json:"title"`
 	Annotations []store.Annotation `json:"annotations"`
+	// Text is what the script translates its text with.
+	Text map[string]string `json:"text,omitempty"`
 	reviewFrame
 }
 
@@ -36,10 +38,10 @@ func (s *Server) editReview(w http.ResponseWriter, r *http.Request) (store.Revie
 	rv, err := s.store.ReviewByEditKey(r.PathValue("key"))
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			jsonError(w, http.StatusNotFound, "This edit link doesn't lead to a review.")
+			jsonError(w, r, http.StatusNotFound, "This edit link doesn't lead to a review.")
 		} else {
 			log.Print(err)
-			jsonError(w, http.StatusInternalServerError, "Something went wrong.")
+			jsonError(w, r, http.StatusInternalServerError, "Something went wrong.")
 		}
 		return rv, false
 	}
@@ -49,21 +51,21 @@ func (s *Server) editReview(w http.ResponseWriter, r *http.Request) (store.Revie
 func (s *Server) editorPage(w http.ResponseWriter, r *http.Request) {
 	rv, err := s.store.ReviewByEditKey(r.PathValue("key"))
 	if err != nil {
-		s.message(w, http.StatusNotFound, "This review isn't here",
+		s.message(w, r, http.StatusNotFound, "This review isn't here",
 			"The edit link may be incomplete. Check you copied all of it.")
 		return
 	}
 	list, err := s.store.Annotations(rv.ID)
 	if err != nil {
 		log.Print(err)
-		s.message(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
+		s.message(w, r, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
 		return
 	}
 	// The edit link is the only key to the review, so it must not leak in a
 	// Referer to anything the page links to.
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Cache-Control", "no-store")
-	s.render(w, http.StatusOK, "editor.html", editorPage{
+	s.render(w, r, http.StatusOK, "editor.html", editorPage{
 		Review:  rv,
 		Version: s.assetVersion,
 		Config: editorConfig{
@@ -74,13 +76,15 @@ func (s *Server) editorPage(w http.ResponseWriter, r *http.Request) {
 			Reviewer:    rv.Reviewer,
 			Title:       rv.Title,
 			Annotations: list,
+			Text:        langOf(r).text(),
 			reviewFrame: newReviewFrame(r, rv),
 		},
 	})
 }
 
-func jsonError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+// jsonError answers with msg, in English, translated for the request.
+func jsonError(w http.ResponseWriter, r *http.Request, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": langOf(r).T(msg)})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -93,21 +97,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // readJSON decodes a request body of at most limit bytes into v.
 func readJSON(w http.ResponseWriter, r *http.Request, limit int64, v any) bool {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit)).Decode(v); err != nil {
-		jsonError(w, http.StatusBadRequest, "That request didn't make sense.")
+		jsonError(w, r, http.StatusBadRequest, "That request didn't make sense.")
 		return false
 	}
 	return true
 }
 
-func (s *Server) storeError(w http.ResponseWriter, err error) {
+func (s *Server) storeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		jsonError(w, http.StatusNotFound, "That annotation is gone.")
+		jsonError(w, r, http.StatusNotFound, "That annotation is gone.")
 	case errors.Is(err, store.ErrInvalid):
-		jsonError(w, http.StatusUnprocessableEntity, "That annotation couldn't be saved.")
+		jsonError(w, r, http.StatusUnprocessableEntity, "That annotation couldn't be saved.")
 	default:
 		log.Print(err)
-		jsonError(w, http.StatusInternalServerError, "Something went wrong.")
+		jsonError(w, r, http.StatusInternalServerError, "Something went wrong.")
 	}
 }
 
@@ -122,7 +126,7 @@ func (s *Server) apiAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.store.AddAnnotation(rv.ID, a)
 	if err != nil {
-		s.storeError(w, err)
+		s.storeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, a)
@@ -144,7 +148,7 @@ func (s *Server) apiUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.store.UpdateAnnotation(rv.ID, annotationID(r), in.Label, in.Comment)
 	if err != nil {
-		s.storeError(w, err)
+		s.storeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, a)
@@ -156,7 +160,7 @@ func (s *Server) apiDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.DeleteAnnotation(rv.ID, annotationID(r)); err != nil {
-		s.storeError(w, err)
+		s.storeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -172,17 +176,17 @@ func (s *Server) apiShot(w http.ResponseWriter, r *http.Request) {
 	}
 	png, err := io.ReadAll(http.MaxBytesReader(w, r.Body, store.MaxShot))
 	if err != nil {
-		jsonError(w, http.StatusRequestEntityTooLarge, "That screenshot is too large.")
+		jsonError(w, r, http.StatusRequestEntityTooLarge, "That screenshot is too large.")
 		return
 	}
 	// Served back as image/png to whoever opens the review, so it had
 	// better be one.
 	if !bytes.HasPrefix(png, pngMagic) {
-		jsonError(w, http.StatusUnsupportedMediaType, "A screenshot has to be a PNG.")
+		jsonError(w, r, http.StatusUnsupportedMediaType, "A screenshot has to be a PNG.")
 		return
 	}
 	if err := s.store.SetShot(rv.ID, annotationID(r), png); err != nil {
-		s.storeError(w, err)
+		s.storeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -200,17 +204,17 @@ func (s *Server) apiApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rv.Count == 0 {
-		jsonError(w, http.StatusUnprocessableEntity, "Mark at least one thing on the page first.")
+		jsonError(w, r, http.StatusUnprocessableEntity, "Mark at least one thing on the page first.")
 		return
 	}
 	if err := s.store.Apply(rv.ID, in.Name); err != nil {
-		s.storeError(w, err)
+		s.storeError(w, r, err)
 		return
 	}
 	rv, _ = s.store.ReviewByCode(rv.Code)
 	list, err := s.store.Annotations(rv.ID)
 	if err != nil {
-		s.storeError(w, err)
+		s.storeError(w, r, err)
 		return
 	}
 	share := baseURL(r) + "/r/" + rv.Code

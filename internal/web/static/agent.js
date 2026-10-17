@@ -27,6 +27,8 @@
   var realPage = new URL(cfg.page);
   var nativeFetch = window.fetch ? window.fetch.bind(window) : null;
   var COLORS = { change: '#206bc4', bug: '#d63939', question: '#f76707', like: '#2fb344' };
+  // tr translates English text with what the server sent.
+  function tr(s) { return (cfg.text && cfg.text[s]) || s; }
 
   function tell(type, data) {
     var m = { pp: type };
@@ -162,7 +164,7 @@
     try { url = toSite(href); } catch (err) { return; }
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return; // mailto:, tel:
     e.preventDefault();
-    if (a.hasAttribute('download')) { tell('notice', { text: 'Downloads are switched off while reviewing.' }); return; }
+    if (a.hasAttribute('download')) { tell('notice', { text: tr('Downloads are switched off while reviewing.') }); return; }
     if (!sameSite(url) || e.ctrlKey || e.metaKey || e.shiftKey) {
       window.open(url.href, '_blank', 'noopener');
       return;
@@ -188,7 +190,7 @@
       go(action.href);
       return;
     }
-    tell('notice', { text: "Forms aren't sent while reviewing, so nothing reached the site." });
+    tell('notice', { text: tr("Forms aren't sent while reviewing, so nothing reached the site.") });
   }
   window.addEventListener('click', function (e) {
     if (e.defaultPrevented || mode === 'annotate') return;
@@ -636,7 +638,7 @@
     badge.style.top = badgeAt[1] + 'px';
     badge.textContent = a === pending ? '+' : String(a.number || '');
     if (a.comment) badge.title = a.comment;
-    if (p.moved) badge.title = (a.comment ? a.comment + '\n\n' : '') + 'The element this was on has moved or is gone.';
+    if (p.moved) badge.title = (a.comment ? a.comment + '\n\n' : '') + tr('The element this was on has moved or is gone.');
     if (a !== pending) {
       badge.addEventListener('click', function (e) { e.stopPropagation(); e.preventDefault(); tell('select', { id: a.id }); });
       badge.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
@@ -784,7 +786,7 @@
     if (r.w > 8 && r.h > 8) {
       startDraft('highlight', 'rects', [[r.x, r.y, r.w, r.h]], anchorFor(r));
     } else {
-      tell('notice', { text: 'Select some text to highlight it, or drag across an area.' });
+      tell('notice', { text: tr('Select some text to highlight it, or drag across an area.') });
     }
   }
 

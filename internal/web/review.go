@@ -327,14 +327,14 @@ func (s *Server) reviewPage(w http.ResponseWriter, r *http.Request) {
 	}
 	rv, err := s.store.ReviewByCode(code)
 	if err != nil {
-		s.message(w, http.StatusNotFound, "This review isn't here",
+		s.message(w, r, http.StatusNotFound, "This review isn't here",
 			"The link may be incomplete. Ask whoever sent it for the whole link.")
 		return
 	}
 	list, err := s.store.Annotations(rv.ID)
 	if err != nil {
 		log.Print(err)
-		s.message(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
+		s.message(w, r, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
 		return
 	}
 	share := baseURL(r) + "/r/" + rv.Code
@@ -360,7 +360,7 @@ func (s *Server) reviewPage(w http.ResponseWriter, r *http.Request) {
 	for _, a := range list {
 		pages[a.PageURL] = true
 	}
-	s.render(w, http.StatusOK, "review.html", reviewView{
+	s.render(w, r, http.StatusOK, "review.html", reviewView{
 		Review:   rv,
 		Items:    items(rv, list, share),
 		Pages:    len(pages),
@@ -374,6 +374,7 @@ func (s *Server) reviewPage(w http.ResponseWriter, r *http.Request) {
 			Reviewer:    rv.Reviewer,
 			Title:       rv.Title,
 			Annotations: list,
+			Text:        langOf(r).text(),
 			reviewFrame: newReviewFrame(r, rv),
 		},
 	})

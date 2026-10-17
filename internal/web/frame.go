@@ -61,21 +61,23 @@ type agentConfig struct {
 }
 
 // frameMessage shows a message in the frame instead of a page, and tells the
-// editor around it what happened.
+// editor around it what happened. title and text are already in the language
+// the request wants.
 func (s *Server) frameMessage(w http.ResponseWriter, r *http.Request, status int, title, text, link string) {
 	frameHeaders(w.Header())
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
+	lang := language(r)
 	note, _ := json.Marshal(map[string]string{"pp": "error", "title": title, "text": text, "link": link})
 	base := baseURL(r)
 	var b strings.Builder
-	b.WriteString(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">`)
+	b.WriteString(`<!doctype html><html lang="` + lang + `"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">`)
 	b.WriteString(`<link rel="stylesheet" href="` + base + `/static/vendor/tabler.min.css"><link rel="stylesheet" href="` + base + `/static/vendor/inter.css">`)
 	b.WriteString(`<style>body{font-family:Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:1.5rem;background:#f6f8fb}` +
 		`.box{max-width:30rem;text-align:center}@media (prefers-color-scheme:dark){body{background:#151f2c;color:#dce1e7}}</style></head><body><div class="box">`)
 	b.WriteString(`<h2>` + html.EscapeString(title) + `</h2><p class="text-secondary">` + html.EscapeString(text) + `</p>`)
 	if link != "" {
-		b.WriteString(`<a class="btn" href="` + html.EscapeString(link) + `" target="_blank" rel="noopener">Open it in a new tab</a>`)
+		b.WriteString(`<a class="btn" href="` + html.EscapeString(link) + `" target="_blank" rel="noopener">` + html.EscapeString(tr(lang, "Open it in a new tab")) + `</a>`)
 	}
 	b.WriteString(`</div><script>parent.postMessage(` + string(note) + `, "*")</script></body></html>`)
 	io.WriteString(w, b.String())
@@ -83,32 +85,33 @@ func (s *Server) frameMessage(w http.ResponseWriter, r *http.Request, status int
 
 // frame shows a page of the site being reviewed, with the review script.
 func (s *Server) frame(w http.ResponseWriter, r *http.Request) {
+	lang := language(r)
 	rv, err := s.store.ReviewByFrameKey(r.PathValue("key"))
 	if err != nil {
-		s.frameMessage(w, r, http.StatusNotFound, "This review is gone", "The link may be wrong, or the review was deleted.", "")
+		s.frameMessage(w, r, http.StatusNotFound, tr(lang, "This review is gone"), tr(lang, "The link may be wrong, or the review was deleted."), "")
 		return
 	}
 	target, err := url.Parse(r.URL.Query().Get("url"))
 	if err != nil || (target.Scheme != "http" && target.Scheme != "https") {
-		s.frameMessage(w, r, http.StatusBadRequest, "That isn't a web page", "Only web pages can be reviewed.", "")
+		s.frameMessage(w, r, http.StatusBadRequest, tr(lang, "That isn't a web page"), tr(lang, "Only web pages can be reviewed."), "")
 		return
 	}
 	if !proxy.SameSite(target.Host, rv.SiteHost) {
-		s.frameMessage(w, r, http.StatusForbidden, "That's another website",
-			"This review is for "+rv.SiteHost+". Pages on other sites open in a new tab.", target.String())
+		s.frameMessage(w, r, http.StatusForbidden, tr(lang, "That's another website"),
+			tr(lang, "This review is for %s. Pages on other sites open in a new tab.", rv.SiteHost), target.String())
 		return
 	}
 	resp, err := s.proxy.Get(r.Context(), target, r.Header)
 	if err != nil {
-		s.frameMessage(w, r, http.StatusBadGateway, "Couldn't load the page", proxy.Explain(err), target.String())
+		s.frameMessage(w, r, http.StatusBadGateway, tr(lang, "Couldn't load the page"), tr(lang, proxy.Explain(err)), target.String())
 		return
 	}
 	defer resp.Body.Close()
 
 	final := resp.Request.URL
 	if !proxy.SameSite(final.Host, rv.SiteHost) {
-		s.frameMessage(w, r, http.StatusForbidden, "That page leads to another website",
-			"It sends visitors on to "+final.Host+", which isn't part of this review.", final.String())
+		s.frameMessage(w, r, http.StatusForbidden, tr(lang, "That page leads to another website"),
+			tr(lang, "It sends visitors on to %s, which isn't part of this review.", final.Host), final.String())
 		return
 	}
 	frameHeaders(w.Header())
@@ -124,7 +127,7 @@ func (s *Server) frame(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := proxy.ReadAll(resp.Body, maxPage)
 	if err != nil {
-		s.frameMessage(w, r, http.StatusBadGateway, "Couldn't load the page", proxy.Explain(err), final.String())
+		s.frameMessage(w, r, http.StatusBadGateway, tr(lang, "Couldn't load the page"), tr(lang, proxy.Explain(err)), final.String())
 		return
 	}
 	doc := proxy.Decode(body, ct)

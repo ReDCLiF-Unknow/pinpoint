@@ -77,8 +77,6 @@ var funcs = template.FuncMap{
 	"tools": func() []labelInfo {
 		return []labelInfo{kinds["pin"], kinds["highlight"], kinds["box"], kinds["draw"]}
 	},
-	"date":   func(t time.Time) string { return t.Local().Format("2 January 2006") },
-	"plural": plural,
 	"json": func(v any) (template.JS, error) {
 		b, err := json.Marshal(v)
 		return template.JS(b), err
@@ -96,7 +94,7 @@ func plural(n int, word string) string {
 type Server struct {
 	store *store.Store
 	proxy *proxy.Client
-	tmpl  *template.Template
+	tmpl  map[string]*template.Template // by language
 	mux   *http.ServeMux
 	// creates limits how fast one address can start reviews, and fetches how
 	// fast it can make the server fetch pages, as each one is a request to
@@ -121,7 +119,7 @@ func WithPrivateNetworks() Option { return func(s *Server) { s.allowPrivate = tr
 func New(s *store.Store, opts ...Option) *Server {
 	srv := &Server{
 		store:      s,
-		tmpl:       template.Must(template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html")),
+		tmpl:       map[string]*template.Template{english: parseTemplates(english), german: parseTemplates(german)},
 		mux:        http.NewServeMux(),
 		creates:    newLimiter(20, time.Minute),
 		fetches:    newLimiter(300, 200*time.Millisecond),
@@ -134,6 +132,10 @@ func New(s *store.Store, opts ...Option) *Server {
 	srv.assetVersion = versionOf("static/agent.js", "static/app.js", "static/vendor/modern-screenshot.js")
 	srv.routes()
 	return srv
+}
+
+func parseTemplates(lang string) *template.Template {
+	return template.Must(template.New("").Funcs(funcs).Funcs(langFuncs(lang)).ParseFS(templateFS, "templates/*.html"))
 }
 
 // versionOf is a short hash of some embedded files.
@@ -162,7 +164,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("Referrer-Policy", "same-origin")
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		if err := s.sameOrigin.Check(r); err != nil {
-			http.Error(w, "This request came from another site.", http.StatusForbidden)
+			http.Error(w, tr(language(r), "This request came from another site."), http.StatusForbidden)
 			return
 		}
 	}
@@ -219,13 +221,18 @@ func baseURL(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-func (s *Server) render(w http.ResponseWriter, status int, name string, data any) {
+// render shows a page in the language this request wants. Its text is
+// written into the templates, so the language is part of what a cache has to
+// tell apart.
+func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, name string, data any) {
+	lang := language(r)
 	var b strings.Builder
-	if err := s.tmpl.ExecuteTemplate(&b, name, data); err != nil {
+	if err := s.tmpl[lang].ExecuteTemplate(&b, name, data); err != nil {
 		log.Printf("render %s: %v", name, err)
-		http.Error(w, "Something went wrong.", http.StatusInternalServerError)
+		http.Error(w, tr(lang, "Something went wrong."), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Add("Vary", "Accept-Language, Cookie")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	io.WriteString(w, b.String())
@@ -238,8 +245,11 @@ type messagePage struct {
 	Version     string
 }
 
-func (s *Server) message(w http.ResponseWriter, status int, title, text string) {
-	s.render(w, status, "message.html", messagePage{Title: title, Text: text, Icon: "map-pin-off", Version: s.assetVersion})
+// message shows a page that says title and text, both in English: they are
+// translated here.
+func (s *Server) message(w http.ResponseWriter, r *http.Request, status int, title, text string) {
+	lang := language(r)
+	s.render(w, r, status, "message.html", messagePage{Title: tr(lang, title), Text: tr(lang, text), Icon: "map-pin-off", Version: s.assetVersion})
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
@@ -253,30 +263,30 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, `<!doctype html><meta charset="utf-8"><script>parent.postMessage({pp:"lost"}, "*")</script>`)
 		return
 	}
-	s.message(w, http.StatusNotFound, "Nothing here", "This link doesn't lead anywhere. If somebody sent it to you, ask them for it again.")
+	s.message(w, r, http.StatusNotFound, "Nothing here", "This link doesn't lead anywhere. If somebody sent it to you, ask them for it again.")
 }
 
 // ---- start ----------------------------------------------------------------
 
 type startPage struct {
 	URL     string
-	Error   string
+	Error   string // in English; the page translates it
 	Version string
 }
 
 func (s *Server) startPage(w http.ResponseWriter, r *http.Request) {
 	// An agency's prepared link: /?url=https://client.example
-	s.render(w, http.StatusOK, "start.html", startPage{URL: r.URL.Query().Get("url"), Version: s.assetVersion})
+	s.render(w, r, http.StatusOK, "start.html", startPage{URL: r.URL.Query().Get("url"), Version: s.assetVersion})
 }
 
 func (s *Server) tooManyReviews(w http.ResponseWriter, r *http.Request) {
-	s.render(w, http.StatusTooManyRequests, "start.html", startPage{URL: r.FormValue("url"),
+	s.render(w, r, http.StatusTooManyRequests, "start.html", startPage{URL: r.FormValue("url"),
 		Error: "That's a lot of reviews in a short time. Wait a minute, then try again.", Version: s.assetVersion})
 }
 
 func (s *Server) tooManyFetches(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Security-Policy", frameCSP)
-	http.Error(w, "Too many pages in a short time. Wait a minute, then try again.", http.StatusTooManyRequests)
+	http.Error(w, tr(language(r), "Too many pages in a short time. Wait a minute, then try again."), http.StatusTooManyRequests)
 }
 
 // siteURL makes sense of what somebody typed into the address field.
@@ -305,7 +315,7 @@ func siteURL(raw string) (*url.URL, error) {
 func (s *Server) createReview(w http.ResponseWriter, r *http.Request) {
 	raw := r.FormValue("url")
 	fail := func(msg string) {
-		s.render(w, http.StatusUnprocessableEntity, "start.html", startPage{URL: raw, Error: msg, Version: s.assetVersion})
+		s.render(w, r, http.StatusUnprocessableEntity, "start.html", startPage{URL: raw, Error: msg, Version: s.assetVersion})
 	}
 	u, err := siteURL(raw)
 	if err != nil {

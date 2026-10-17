@@ -48,13 +48,32 @@
 {{end}}
 
 {{define "theme-toggle"}}
-<button type="button" class="btn btn-icon btn-ghost-secondary" data-theme-toggle title="Switch between light and dark" aria-label="Switch between light and dark">
+<button type="button" class="btn btn-icon btn-ghost-secondary" data-theme-toggle title="{{t "Switch between light and dark"}}" aria-label="{{t "Switch between light and dark"}}">
   <i class="ti ti-moon icon-to-dark"></i><i class="ti ti-sun icon-to-light"></i>
 </button>
 {{end}}
 
+{{/* Shows the other language, named in that language, as people look for
+     their own. */}}
+{{define "lang-toggle"}}
+{{if eq lang "de"}}
+<button type="button" class="btn btn-ghost-secondary px-2 fw-bold" data-lang="en" lang="en" title="In English" aria-label="In English">EN</button>
+{{else}}
+<button type="button" class="btn btn-ghost-secondary px-2 fw-bold" data-lang="de" lang="de" title="Auf Deutsch" aria-label="Auf Deutsch">DE</button>
+{{end}}
+{{end}}
+
 {{define "theme-script"}}
 <script>
+  // The language is the server's to apply, so the choice goes in a cookie
+  // and the page comes again. A failed start form (a POST to /reviews) has no
+  // page to come back to, so that goes to the start page.
+  document.querySelectorAll('[data-lang]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.cookie = 'lang=' + b.dataset.lang + '; path=/; max-age=31536000; samesite=lax';
+      location.assign(location.pathname === '/reviews' ? '/' : location.href);
+    });
+  });
   document.querySelectorAll('[data-theme-toggle]').forEach(function (b) {
     b.addEventListener('click', function () {
       var t = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';

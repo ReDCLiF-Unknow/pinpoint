@@ -49,21 +49,21 @@ func (s *Server) editReview(w http.ResponseWriter, r *http.Request) (store.Revie
 func (s *Server) editorPage(w http.ResponseWriter, r *http.Request) {
 	rv, err := s.store.ReviewByEditKey(r.PathValue("key"))
 	if err != nil {
-		s.message(w, http.StatusNotFound, "This review isn't here",
+		s.message(w, r, http.StatusNotFound, "This review isn't here",
 			"The edit link may be incomplete. Check you copied all of it.")
 		return
 	}
 	list, err := s.store.Annotations(rv.ID)
 	if err != nil {
 		log.Print(err)
-		s.message(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
+		s.message(w, r, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
 		return
 	}
 	// The edit link is the only key to the review, so it must not leak in a
 	// Referer to anything the page links to.
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Cache-Control", "no-store")
-	s.render(w, http.StatusOK, "editor.html", editorPage{
+	s.render(w, r, http.StatusOK, "editor.html", editorPage{
 		Review:  rv,
 		Version: s.assetVersion,
 		Config: editorConfig{

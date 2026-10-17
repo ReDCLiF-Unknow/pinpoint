@@ -508,6 +508,8 @@
   var host, shadow, surface, svg, marks, hover, hint;
   var mode = 'browse', tool = 'pin';
   var shown = [], selected = 0, pending = null, drag = null;
+  // The editor says this in the reviewer's language when it shows the marks.
+  var movedText = 'The element this was on has moved or is gone.';
 
   var CSS_TEXT = [
     ':host { all: initial; }',
@@ -636,7 +638,7 @@
     badge.style.top = badgeAt[1] + 'px';
     badge.textContent = a === pending ? '+' : String(a.number || '');
     if (a.comment) badge.title = a.comment;
-    if (p.moved) badge.title = (a.comment ? a.comment + '\n\n' : '') + 'The element this was on has moved or is gone.';
+    if (p.moved) badge.title = (a.comment ? a.comment + '\n\n' : '') + movedText;
     if (a !== pending) {
       badge.addEventListener('click', function (e) { e.stopPropagation(); e.preventDefault(); tell('select', { id: a.id }); });
       badge.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
@@ -1039,6 +1041,7 @@
         break;
       case 'show':
         shown = Array.isArray(m.list) ? m.list : [];
+        if (typeof m.moved === 'string') movedText = m.moved;
         found.clear();
         if (m.selected !== undefined) selected = m.selected;
         layout();

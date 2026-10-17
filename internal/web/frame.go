@@ -5,8 +5,10 @@ import (
 	"html"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
 	"pinpoint/internal/proxy"
@@ -145,6 +147,11 @@ func (s *Server) frame(w http.ResponseWriter, r *http.Request) {
 // than from its own site: an image or a font for a screenshot (which has to
 // be read, and a browser only lets a page read what the other site allows),
 // or data the page's own scripts ask its site for.
+//
+// Anything on the site being reviewed comes back whatever it is. From other
+// sites only what a screenshot needs does (images, fonts and stylesheets), so
+// a review's key cannot be used to read any page on the internet with
+// PinPoint's permission to share it.
 func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	// What comes back is somebody else's file. It is never a page of
@@ -154,7 +161,8 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 	h.Set("Access-Control-Allow-Origin", "*")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
-	if _, err := s.store.ReviewByFrameKey(r.PathValue("key")); err != nil {
+	rv, err := s.store.ReviewByFrameKey(r.PathValue("key"))
+	if err != nil {
 		http.Error(w, "unknown review", http.StatusNotFound)
 		return
 	}
@@ -169,6 +177,13 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+	// Where it ended up, not where it was asked for: the site's own address
+	// can redirect anywhere.
+	final := resp.Request.URL
+	if !proxy.SameSite(final.Host, rv.SiteHost) && !forScreenshot(resp.Header.Get("Content-Type"), final.Path) {
+		http.Error(w, "Only images, fonts and stylesheets come from other sites.", http.StatusForbidden)
+		return
+	}
 	body, err := proxy.ReadAll(resp.Body, maxResource)
 	if err != nil {
 		http.Error(w, proxy.Explain(err), http.StatusBadGateway)
@@ -180,6 +195,39 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 	h.Set("Cache-Control", "private, max-age=300")
 	w.WriteHeader(resp.StatusCode)
 	w.Write(body)
+}
+
+// fontTypes are the older names fonts are served under, before font/*.
+var fontTypes = map[string]bool{
+	"application/font-woff":         true,
+	"application/font-woff2":        true,
+	"application/font-sfnt":         true,
+	"application/x-font-woff":       true,
+	"application/x-font-ttf":        true,
+	"application/x-font-otf":        true,
+	"application/x-font-opentype":   true,
+	"application/x-font-truetype":   true,
+	"application/vnd.ms-fontobject": true,
+}
+
+// fontFiles are the extensions of font files, which some servers send as
+// anonymous bytes.
+var fontFiles = map[string]bool{".woff": true, ".woff2": true, ".ttf": true, ".otf": true, ".eot": true}
+
+// forScreenshot reports whether a file from another site is something a
+// screenshot needs: an image, a font, or a stylesheet that says which fonts.
+func forScreenshot(contentType, urlPath string) bool {
+	mt, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(mt, "image/"), strings.HasPrefix(mt, "font/"), mt == "text/css", fontTypes[mt]:
+		return true
+	case mt == "application/octet-stream", mt == "binary/octet-stream":
+		return fontFiles[strings.ToLower(path.Ext(urlPath))]
+	}
+	return false
 }
 
 // reviewFrame is what the editor and the shared review need to show a site.

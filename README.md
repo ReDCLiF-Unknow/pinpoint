@@ -73,6 +73,9 @@ loads (styles, scripts, images) comes straight from the real site, as it would w
   read PinPoint's pages, cookies or storage.
 - **Nothing is sent to the site.** Forms are not submitted while reviewing, and nothing is signed in: PinPoint
   never passes on cookies.
+- **Screenshots fetch only what they need.** A screenshot needs the page's images and fonts, so PinPoint
+  fetches those for it. From the site being reviewed it passes on anything, but from other sites only images,
+  fonts and stylesheets, so nobody can use a review to read other websites through PinPoint.
 - **Only public websites.** PinPoint will not fetch addresses on private networks or on the machine it runs
   on, so nobody can use it to look inside the network it runs in. For a server only you can reach, set
   `PINPOINT_ALLOW_PRIVATE=on` to review sites on your own machine or network.

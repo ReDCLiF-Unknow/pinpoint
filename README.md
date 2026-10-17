@@ -12,6 +12,10 @@ screenshot with the mark drawn on it.
 Go, SQLite, `html/template` and the [Tabler](https://tabler.io) UI. One binary serves everything, including
 its own CSS, scripts and fonts.
 
+PinPoint speaks English and German. It follows the browser's language, and the **DE**/**EN** switch beside
+the theme toggle changes it. What the coding AI reads stays English, with the customer's comments as they
+wrote them.
+
 ![The review editor: the website in a frame, with a pin, a box, a drawing and a highlight on it, each numbered, and the list of comments beside it](docs/editor.png)
 
 ## How it works

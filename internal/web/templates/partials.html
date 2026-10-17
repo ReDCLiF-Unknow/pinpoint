@@ -48,7 +48,13 @@
 {{end}}
 
 {{define "theme-toggle"}}
-<button type="button" class="btn btn-icon btn-ghost-secondary" data-theme-toggle title="Switch between light and dark" aria-label="Switch between light and dark">
+{{/* The language switch: it offers the other language, named in that language. */}}
+{{if eq lang "de"}}
+<button type="button" class="btn btn-ghost-secondary px-2" data-lang="en" lang="en" title="Show in English">EN</button>
+{{else}}
+<button type="button" class="btn btn-ghost-secondary px-2" data-lang="de" lang="de" title="Auf Deutsch anzeigen">DE</button>
+{{end}}
+<button type="button" class="btn btn-icon btn-ghost-secondary" data-theme-toggle title="{{t "Switch between light and dark"}}" aria-label="{{t "Switch between light and dark"}}">
   <i class="ti ti-moon icon-to-dark"></i><i class="ti ti-sun icon-to-light"></i>
 </button>
 {{end}}
@@ -60,6 +66,12 @@
       var t = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-bs-theme', t);
       try { localStorage.setItem('theme', t); } catch (e) {}
+    });
+  });
+  document.querySelectorAll('[data-lang]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.cookie = 'lang=' + b.dataset.lang + '; path=/; max-age=31536000; samesite=lax';
+      location.reload();
     });
   });
 </script>
@@ -87,6 +99,8 @@
     .seg .ti { font-size: 1.1rem; }
     .tools[aria-disabled="true"] { opacity: .5; }
     @media (max-width: 1199.98px) { .seg .lbl { display: none; } }
+    /* German labels are longer, so they make way sooner */
+    @media (max-width: 1399.98px) { :root:lang(de) .seg .lbl { display: none; } }
 
     .main { flex: 1; display: flex; min-height: 0; }
     .stage { flex: 1; position: relative; min-width: 0; display: flex; justify-content: center; }

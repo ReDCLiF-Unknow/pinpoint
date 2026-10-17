@@ -101,6 +101,16 @@ go run ./cmd/server -addr localhost:8080
 Then open <http://localhost:8080>. Put it behind HTTPS (Caddy, nginx, a hosting platform) to use it on the
 internet. PinPoint reads `X-Forwarded-Proto` to build its links.
 
+PinPoint limits how often one visitor can start reviews and load pages. Behind a proxy every visitor seems to
+come from the proxy's address, so they all share one limit. To count them apart, set
+`PINPOINT_TRUSTED_PROXIES` to the proxy's addresses, as a comma-separated list of IPs and ranges: for example
+`PINPOINT_TRUSTED_PROXIES=127.0.0.1,::1` for a proxy on the same machine. PinPoint then believes
+`X-Forwarded-For` on connections from those addresses, as far back as they wrote it. Only list a proxy that adds
+to that header itself, at an address nobody else can connect from: anything arriving from a listed address can
+claim to be anyone. Without the variable the header is ignored. Docker Desktop's published ports can also make
+every visitor look like one address; that adds no header, so put a proxy in front if the shared limit gets in
+the way, and don't list Docker's own addresses unless only the proxy can reach the port.
+
 ## Development
 
 ```

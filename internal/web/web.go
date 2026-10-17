@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -104,6 +105,9 @@ type Server struct {
 	creates, fetches *limiter
 	sameOrigin       *http.CrossOriginProtection
 	allowPrivate     bool
+	// proxies are the reverse proxies whose X-Forwarded-For says who the
+	// visitor is, for the limits. None unless the operator names them.
+	proxies []netip.Prefix
 	// assetVersion changes whenever the page scripts do, so browsers fetch
 	// them again after an upgrade rather than mixing old and new.
 	assetVersion string
@@ -116,6 +120,12 @@ type Option func(*Server)
 // machine. Only for a server nobody else can reach: otherwise anyone could
 // use it to look inside the network it runs in.
 func WithPrivateNetworks() Option { return func(s *Server) { s.allowPrivate = true } }
+
+// WithTrustedProxies names the reverse proxies in front of the server, so the
+// limits count each visitor rather than the proxy. Only list proxies that add
+// to X-Forwarded-For themselves: anything that reaches the server directly
+// from one of these addresses can claim to be anybody.
+func WithTrustedProxies(p []netip.Prefix) Option { return func(s *Server) { s.proxies = p } }
 
 // New makes the web app.
 func New(s *store.Store, opts ...Option) *Server {
@@ -172,7 +182,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() {
 	m := s.mux
 	m.HandleFunc("GET /{$}", s.startPage)
-	m.HandleFunc("POST /reviews", limited(s.creates, s.createReview, s.tooManyReviews))
+	m.HandleFunc("POST /reviews", s.limited(s.creates, s.createReview, s.tooManyReviews))
 
 	m.HandleFunc("GET /edit/{key}", s.editorPage)
 	m.HandleFunc("POST /edit/{key}/annotations", s.apiAdd)
@@ -184,8 +194,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /r/{code}", s.reviewPage)
 	m.HandleFunc("GET /r/{code}/{shot}", s.shot)
 
-	m.HandleFunc("GET /f/{key}", limited(s.fetches, s.frame, s.tooManyFetches))
-	m.HandleFunc("GET /x/{key}", limited(s.fetches, s.resource, s.tooManyFetches))
+	m.HandleFunc("GET /f/{key}", s.limited(s.fetches, s.frame, s.tooManyFetches))
+	m.HandleFunc("GET /x/{key}", s.limited(s.fetches, s.resource, s.tooManyFetches))
 
 	static, _ := fs.Sub(staticFS, "static")
 	files := http.StripPrefix("/static/", http.FileServerFS(static))

@@ -23,6 +23,12 @@ func main() {
 	dbPath := flag.String("db", "pinpoint.db", "path to the SQLite database file")
 	flag.Parse()
 
+	// Read before the database is open, as a typo here stops the server.
+	proxies, err := web.ParseTrustedProxies(os.Getenv("PINPOINT_TRUSTED_PROXIES"))
+	if err != nil {
+		log.Fatal("PINPOINT_TRUSTED_PROXIES: ", err)
+	}
+
 	_, statErr := os.Stat(*dbPath)
 	existed := statErr == nil
 
@@ -49,6 +55,16 @@ func main() {
 		log.Print("private networks: ALLOWED. Reviews can show sites on this machine and its network, so nobody else must be able to reach this server.")
 	} else {
 		log.Print("private networks: refused (reviews show public websites only)")
+	}
+	if len(proxies) > 0 {
+		opts = append(opts, web.WithTrustedProxies(proxies))
+		names := make([]string, len(proxies))
+		for i, p := range proxies {
+			names[i] = p.String()
+		}
+		log.Printf("trusted proxies: %s. Their X-Forwarded-For says who each visitor is, for the rate limits.", strings.Join(names, ", "))
+	} else {
+		log.Print("trusted proxies: none (rate limits count the address that connects, and X-Forwarded-For is ignored)")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
